@@ -1,0 +1,1695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Alexa+ Ambient Focus & Environment Sync Agent — Hackathon Dashboard" />
+    <title>Alexa+ Ambient Focus Agent</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+        /* ================================================================
+           DESIGN TOKENS
+           ================================================================ */
+        :root {
+            /* Palette */
+            --bg-primary:       #0a0e1a;
+            --bg-secondary:     #111827;
+            --bg-card:          rgba(17, 24, 39, 0.65);
+            --bg-card-border:   rgba(99, 102, 241, 0.12);
+
+            --text-primary:     #f1f5f9;
+            --text-secondary:   #94a3b8;
+            --text-muted:       #64748b;
+
+            --accent-indigo:    #6366f1;
+            --accent-cyan:      #22d3ee;
+            --accent-emerald:   #34d399;
+            --accent-rose:      #f43f5e;
+            --accent-amber:     #fbbf24;
+            --accent-violet:    #a78bfa;
+
+            /* Focus-mode palette */
+            --focus-blue:       #3b82f6;
+            --focus-blue-glow:  rgba(59, 130, 246, 0.45);
+            --break-green:      #86efac;
+            --break-green-glow: rgba(134, 239, 172, 0.35);
+            --dnd-crimson:      #dc2626;
+            --dnd-crimson-glow: rgba(220, 38, 38, 0.40);
+
+            /* Sizing */
+            --radius-sm: 8px;
+            --radius-md: 14px;
+            --radius-lg: 22px;
+            --radius-full: 9999px;
+
+            /* Transitions */
+            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* ================================================================
+           RESET & BASE
+           ================================================================ */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html {
+            font-size: 16px;
+            scroll-behavior: smooth;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Ambient animated background gradient */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 60% at 50% -20%, rgba(99,102,241,0.15) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 50% at 80% 100%, rgba(34,211,238,0.08) 0%, transparent 50%);
+            z-index: 0;
+            pointer-events: none;
+            animation: bgPulse 12s ease-in-out infinite alternate;
+        }
+
+        @keyframes bgPulse {
+            0%   { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        /* ================================================================
+           LAYOUT
+           ================================================================ */
+        .app-wrapper {
+            position: relative;
+            z-index: 1;
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 40px 24px 60px;
+        }
+
+        /* ── Header ─────────────────────────────────────────────── */
+        .header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .header__badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent-cyan);
+            background: rgba(34, 211, 238, 0.08);
+            border: 1px solid rgba(34, 211, 238, 0.18);
+            padding: 5px 14px;
+            border-radius: var(--radius-full);
+            margin-bottom: 16px;
+        }
+
+        .header__badge::before {
+            content: '';
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: 0.4; transform: scale(0.7); }
+        }
+
+        .header__title {
+            font-size: clamp(1.8rem, 4vw, 2.8rem);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-violet) 50%, var(--accent-cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.15;
+        }
+
+        .header__subtitle {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-top: 10px;
+            font-weight: 400;
+        }
+
+        /* ── Grid ───────────────────────────────────────────────── */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Timer takes full first row */
+        .timer-section {
+            grid-column: 1 / -1;
+        }
+
+        /* ================================================================
+           CARDS (shared)
+           ================================================================ */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--bg-card-border);
+            border-radius: var(--radius-lg);
+            padding: 28px 32px;
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            transition: border-color 0.6s var(--ease-smooth),
+                        box-shadow 0.6s var(--ease-smooth),
+                        background 0.6s var(--ease-smooth);
+        }
+
+        .card__label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-muted);
+            margin-bottom: 18px;
+        }
+
+        .card__label-icon {
+            font-size: 1rem;
+        }
+
+        /* ================================================================
+           TIMER CARD
+           ================================================================ */
+        .timer-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 44px 32px 40px;
+        }
+
+        /* Radial countdown ring */
+        .timer-ring-wrapper {
+            position: relative;
+            width: 260px;
+            height: 260px;
+            margin-bottom: 32px;
+        }
+
+        .timer-ring-svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .timer-ring__track {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.04);
+            stroke-width: 8;
+        }
+
+        .timer-ring__progress {
+            fill: none;
+            stroke: url(#ring-gradient);
+            stroke-width: 8;
+            stroke-linecap: round;
+            stroke-dasharray: 754;  /* 2 * π * 120 */
+            stroke-dashoffset: 0;
+            transition: stroke-dashoffset 1s linear, stroke 0.6s var(--ease-smooth);
+        }
+
+        .timer-ring__progress--break {
+            stroke: var(--break-green);
+        }
+
+        .timer-ring-center {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .timer-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 3.2rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            color: var(--text-primary);
+            line-height: 1;
+        }
+
+        .timer-phase-label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-top: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        /* Glow behind ring in focus mode */
+        .timer-ring-wrapper::after {
+            content: '';
+            position: absolute;
+            inset: 20px;
+            border-radius: 50%;
+            background: transparent;
+            transition: background 0.8s var(--ease-smooth), box-shadow 0.8s var(--ease-smooth);
+            z-index: -1;
+        }
+
+        .timer-ring-wrapper.glow-focus::after {
+            background: radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%);
+            box-shadow: 0 0 60px 10px rgba(59,130,246,0.12);
+        }
+
+        .timer-ring-wrapper.glow-break::after {
+            background: radial-gradient(circle, rgba(134,239,172,0.08) 0%, transparent 70%);
+            box-shadow: 0 0 60px 10px rgba(134,239,172,0.12);
+        }
+
+        /* Controls row */
+        .timer-controls {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* Duration picker */
+        .duration-picker {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+
+        .duration-picker label {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .duration-input {
+            width: 72px;
+            padding: 8px 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: var(--radius-sm);
+            text-align: center;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .duration-input:focus {
+            border-color: var(--accent-indigo);
+        }
+
+        .duration-picker span {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 28px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: none;
+            border-radius: var(--radius-full);
+            cursor: pointer;
+            transition: all 0.3s var(--ease-smooth);
+            outline: none;
+        }
+
+        .btn--primary {
+            background: linear-gradient(135deg, var(--accent-indigo), var(--accent-violet));
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(99,102,241,0.3);
+        }
+
+        .btn--primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(99,102,241,0.45);
+        }
+
+        .btn--primary:active { transform: translateY(0); }
+
+        .btn--confirm {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(16,185,129,0.3);
+        }
+
+        .btn--confirm:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(16,185,129,0.45);
+        }
+
+        .btn--danger {
+            background: rgba(244, 63, 94, 0.12);
+            color: var(--accent-rose);
+            border: 1px solid rgba(244,63,94,0.2);
+        }
+
+        .btn--danger:hover {
+            background: rgba(244, 63, 94, 0.22);
+            transform: translateY(-2px);
+        }
+
+        .btn--ghost {
+            background: rgba(255,255,255,0.04);
+            color: var(--text-secondary);
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .btn--ghost:hover {
+            background: rgba(255,255,255,0.08);
+            color: var(--text-primary);
+        }
+
+        .btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* ================================================================
+           HITL CONFIRMATION MODAL
+           ================================================================ */
+        .hitl-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.35s var(--ease-smooth);
+        }
+
+        .hitl-overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .hitl-modal {
+            background: var(--bg-secondary);
+            border: 1px solid rgba(99,102,241,0.2);
+            border-radius: var(--radius-lg);
+            padding: 36px 40px;
+            max-width: 480px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.5);
+            transform: translateY(20px) scale(0.96);
+            transition: transform 0.35s var(--ease-smooth);
+        }
+
+        .hitl-overlay.visible .hitl-modal {
+            transform: translateY(0) scale(1);
+        }
+
+        .hitl-modal__icon {
+            font-size: 2.6rem;
+            margin-bottom: 16px;
+        }
+
+        .hitl-modal__title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .hitl-modal__body {
+            font-size: 0.92rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 28px;
+        }
+
+        .hitl-modal__actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        /* ================================================================
+           ROOM LIGHTING CARD
+           ================================================================ */
+        .lighting-card {
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.8s var(--ease-smooth),
+                        box-shadow 0.8s var(--ease-smooth),
+                        background 0.8s var(--ease-smooth);
+        }
+
+        .lighting-card::before {
+            content: '';
+            position: absolute;
+            top: -60%;
+            left: -30%;
+            width: 160%;
+            height: 160%;
+            border-radius: 50%;
+            opacity: 0;
+            transition: opacity 0.8s var(--ease-smooth), background 0.8s var(--ease-smooth);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* Normal state */
+        .lighting-card--normal {
+            border-color: rgba(255,255,255,0.06);
+        }
+
+        .lighting-card--normal::before {
+            background: radial-gradient(circle, rgba(255,255,255,0.02) 0%, transparent 70%);
+            opacity: 1;
+        }
+
+        /* Focus state — neon blue glow */
+        .lighting-card--focus {
+            border-color: rgba(59, 130, 246, 0.35);
+            box-shadow:
+                0 0 30px rgba(59, 130, 246, 0.12),
+                inset 0 0 40px rgba(59, 130, 246, 0.06);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .lighting-card--focus::before {
+            background: radial-gradient(circle, rgba(59,130,246,0.10) 0%, transparent 60%);
+            opacity: 1;
+        }
+
+        /* Break state — soft pastel green */
+        .lighting-card--break {
+            border-color: rgba(134, 239, 172, 0.35);
+            box-shadow:
+                0 0 30px rgba(134, 239, 172, 0.12),
+                inset 0 0 40px rgba(134, 239, 172, 0.06);
+            background: rgba(134, 239, 172, 0.05);
+        }
+
+        .lighting-card--break::before {
+            background: radial-gradient(circle, rgba(134,239,172,0.10) 0%, transparent 60%);
+            opacity: 1;
+        }
+
+        .lighting-visual {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .lighting-bulb {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            transition: all 0.8s var(--ease-smooth);
+            flex-shrink: 0;
+        }
+
+        .lighting-bulb--normal {
+            background: rgba(255,255,255,0.06);
+            box-shadow: 0 0 0 transparent;
+        }
+
+        .lighting-bulb--focus {
+            background: rgba(59,130,246,0.18);
+            box-shadow: 0 0 24px var(--focus-blue-glow), 0 0 48px rgba(59,130,246,0.15);
+            animation: bulbPulse 3s ease-in-out infinite;
+        }
+
+        .lighting-bulb--break {
+            background: rgba(134,239,172,0.18);
+            box-shadow: 0 0 24px var(--break-green-glow), 0 0 48px rgba(134,239,172,0.15);
+        }
+
+        @keyframes bulbPulse {
+            0%, 100% { box-shadow: 0 0 24px var(--focus-blue-glow), 0 0 48px rgba(59,130,246,0.15); }
+            50%      { box-shadow: 0 0 32px var(--focus-blue-glow), 0 0 64px rgba(59,130,246,0.25); }
+        }
+
+        .lighting-info__status {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 3px;
+            transition: color 0.6s var(--ease-smooth);
+        }
+
+        .lighting-info__status--normal { color: var(--text-secondary); }
+        .lighting-info__status--focus  { color: var(--focus-blue); }
+        .lighting-info__status--break  { color: var(--break-green); }
+
+        .lighting-info__detail {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        /* ================================================================
+           PHONE DND CARD
+           ================================================================ */
+        .dnd-card {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dnd-visual {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .dnd-icon-circle {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            transition: all 0.6s var(--ease-smooth);
+            flex-shrink: 0;
+        }
+
+        .dnd-icon-circle--off {
+            background: rgba(255,255,255,0.04);
+        }
+
+        .dnd-icon-circle--engaged {
+            background: rgba(220, 38, 38, 0.15);
+            box-shadow: 0 0 24px var(--dnd-crimson-glow);
+            animation: dndPulse 2.5s ease-in-out infinite;
+        }
+
+        @keyframes dndPulse {
+            0%, 100% { box-shadow: 0 0 24px var(--dnd-crimson-glow); }
+            50%      { box-shadow: 0 0 36px rgba(220,38,38,0.55); }
+        }
+
+        .dnd-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 14px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            border-radius: var(--radius-full);
+            transition: all 0.5s var(--ease-smooth);
+        }
+
+        .dnd-badge--off {
+            background: rgba(255,255,255,0.04);
+            color: var(--text-muted);
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .dnd-badge--engaged {
+            background: rgba(220, 38, 38, 0.14);
+            color: var(--dnd-crimson);
+            border: 1px solid rgba(220,38,38,0.25);
+        }
+
+        .dnd-badge__dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            transition: background 0.5s;
+        }
+
+        .dnd-badge__dot--off { background: var(--text-muted); }
+
+        .dnd-badge__dot--engaged {
+            background: var(--dnd-crimson);
+            animation: pulse-dot 1.8s ease-in-out infinite;
+        }
+
+        .dnd-info__status {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            transition: color 0.5s;
+        }
+
+        .dnd-info__status--off     { color: var(--text-secondary); }
+        .dnd-info__status--engaged { color: var(--dnd-crimson); }
+
+        .dnd-info__detail {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        /* ================================================================
+           AUDIO PLAYER SECTION
+           ================================================================ */
+        .audio-section {
+            grid-column: 1 / -1;
+        }
+
+        .audio-card {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .audio-visualizer {
+            display: flex;
+            align-items: flex-end;
+            gap: 3px;
+            height: 36px;
+            flex-shrink: 0;
+        }
+
+        .audio-bar {
+            width: 4px;
+            border-radius: 2px;
+            background: var(--accent-indigo);
+            transition: height 0.15s ease;
+        }
+
+        .audio-bar.active {
+            animation: audioBarBounce 0.8s ease-in-out infinite;
+        }
+
+        .audio-bar:nth-child(1) { height: 12px; animation-delay: 0s; }
+        .audio-bar:nth-child(2) { height: 20px; animation-delay: 0.1s; }
+        .audio-bar:nth-child(3) { height: 28px; animation-delay: 0.2s; }
+        .audio-bar:nth-child(4) { height: 16px; animation-delay: 0.3s; }
+        .audio-bar:nth-child(5) { height: 24px; animation-delay: 0.15s; }
+        .audio-bar:nth-child(6) { height: 10px; animation-delay: 0.25s; }
+        .audio-bar:nth-child(7) { height: 18px; animation-delay: 0.05s; }
+        .audio-bar:nth-child(8) { height: 30px; animation-delay: 0.35s; }
+
+        @keyframes audioBarBounce {
+            0%, 100% { transform: scaleY(0.4); opacity: 0.5; }
+            50%      { transform: scaleY(1);   opacity: 1; }
+        }
+
+        .audio-info {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .audio-info__title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .audio-info__detail {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .volume-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 90px;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255,255,255,0.08);
+            outline: none;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--accent-indigo);
+            cursor: pointer;
+        }
+
+        /* ================================================================
+           EVENT LOG
+           ================================================================ */
+        .log-section {
+            grid-column: 1 / -1;
+        }
+
+        .event-log {
+            max-height: 160px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            line-height: 1.7;
+            color: var(--text-muted);
+            padding-right: 8px;
+        }
+
+        .event-log::-webkit-scrollbar { width: 4px; }
+        .event-log::-webkit-scrollbar-track { background: transparent; }
+        .event-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
+
+        .event-log__entry {
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.02);
+        }
+
+        .event-log__time {
+            color: var(--accent-cyan);
+            margin-right: 8px;
+        }
+
+        .event-log__tag {
+            font-weight: 600;
+            margin-right: 6px;
+        }
+
+        .event-log__tag--info    { color: var(--accent-indigo); }
+        .event-log__tag--success { color: var(--accent-emerald); }
+        .event-log__tag--warn    { color: var(--accent-amber); }
+        .event-log__tag--error   { color: var(--accent-rose); }
+
+        /* ================================================================
+           USER INPUT BAR
+           ================================================================ */
+        .input-section {
+            grid-column: 1 / -1;
+        }
+
+        .input-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .input-field {
+            flex: 1;
+            padding: 14px 20px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: var(--radius-full);
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .input-field::placeholder { color: var(--text-muted); }
+
+        .input-field:focus {
+            border-color: rgba(99,102,241,0.4);
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.08);
+        }
+
+        /* ================================================================
+           RESPONSIVE FINE-TUNING
+           ================================================================ */
+        @media (max-width: 520px) {
+            .app-wrapper { padding: 24px 14px 40px; }
+            .card { padding: 22px 18px; }
+            .timer-ring-wrapper { width: 200px; height: 200px; }
+            .timer-display { font-size: 2.4rem; }
+            .hitl-modal { padding: 28px 22px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper">
+
+        <!-- ═══════════ HEADER ═══════════ -->
+        <header class="header">
+            <div class="header__badge">Agent Online</div>
+            <h1 class="header__title">Alexa+ Ambient Focus Agent</h1>
+            <p class="header__subtitle">Human-in-the-Loop Environment Orchestration</p>
+        </header>
+
+        <!-- ═══════════ DASHBOARD GRID ═══════════ -->
+        <div class="dashboard-grid">
+
+            <!-- ── User Intent Input ─────────────────────────── -->
+            <section class="input-section">
+                <div class="card">
+                    <div class="card__label">
+                        <span class="card__label-icon">🎙️</span> Voice Command / Intent
+                    </div>
+                    <div class="input-bar">
+                        <input
+                            type="text"
+                            id="intentInput"
+                            class="input-field"
+                            placeholder="Try: 'Start a 25-minute deep work session'"
+                            autocomplete="off"
+                        />
+                        <button id="sendBtn" class="btn btn--primary" onclick="handleSendIntent()">
+                            Send
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── Radial Timer ──────────────────────────────── -->
+            <section class="timer-section">
+                <div class="card timer-card" id="timerCard">
+                    <div class="card__label">
+                        <span class="card__label-icon">⏱️</span> Focus Countdown
+                    </div>
+
+                    <div class="duration-picker" id="durationPicker">
+                        <label for="durationInput">Duration</label>
+                        <input type="number" id="durationInput" class="duration-input" value="25" min="1" max="120" />
+                        <span>minutes</span>
+                    </div>
+
+                    <div class="timer-ring-wrapper" id="timerRingWrapper">
+                        <svg class="timer-ring-svg" viewBox="0 0 260 260">
+                            <defs>
+                                <linearGradient id="ring-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#6366f1" />
+                                    <stop offset="50%" stop-color="#3b82f6" />
+                                    <stop offset="100%" stop-color="#22d3ee" />
+                                </linearGradient>
+                                <linearGradient id="ring-gradient-break" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#34d399" />
+                                    <stop offset="100%" stop-color="#86efac" />
+                                </linearGradient>
+                            </defs>
+                            <circle class="timer-ring__track" cx="130" cy="130" r="120" />
+                            <circle class="timer-ring__progress" id="timerProgress" cx="130" cy="130" r="120" />
+                        </svg>
+                        <div class="timer-ring-center">
+                            <div class="timer-display" id="timerDisplay">25:00</div>
+                            <div class="timer-phase-label" id="timerPhaseLabel">Idle</div>
+                        </div>
+                    </div>
+
+                    <div class="timer-controls">
+                        <button id="cancelBtn" class="btn btn--danger" onclick="handleCancel()" disabled>
+                            ✕ Cancel Session
+                        </button>
+                        <button id="resetBtn" class="btn btn--ghost" onclick="handleReset()">
+                            ↻ Reset
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── Room Lighting Status ──────────────────────── -->
+            <section>
+                <div class="card lighting-card lighting-card--normal" id="lightingCard">
+                    <div class="card__label">
+                        <span class="card__label-icon">💡</span> Room Lighting
+                    </div>
+                    <div class="lighting-visual">
+                        <div class="lighting-bulb lighting-bulb--normal" id="lightingBulb">
+                            💡
+                        </div>
+                        <div class="lighting-info">
+                            <div class="lighting-info__status lighting-info__status--normal" id="lightingStatus">
+                                Standard White
+                            </div>
+                            <div class="lighting-info__detail" id="lightingDetail">
+                                Normal ambient lighting active
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── Phone DND Status ──────────────────────────── -->
+            <section>
+                <div class="card dnd-card" id="dndCard">
+                    <div class="card__label">
+                        <span class="card__label-icon">📱</span> Phone DND
+                    </div>
+                    <div class="dnd-visual">
+                        <div class="dnd-icon-circle dnd-icon-circle--off" id="dndIconCircle">
+                            🔔
+                        </div>
+                        <div class="dnd-info">
+                            <div class="dnd-info__status dnd-info__status--off" id="dndStatus">
+                                Notifications Active
+                            </div>
+                            <div class="dnd-info__detail" id="dndDetail">
+                                All alerts coming through
+                            </div>
+                            <div class="dnd-badge dnd-badge--off" id="dndBadge">
+                                <span class="dnd-badge__dot dnd-badge__dot--off" id="dndBadgeDot"></span>
+                                <span id="dndBadgeText">DND Off</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── Ambient Audio Player ──────────────────────── -->
+            <section class="audio-section">
+                <div class="card audio-card" id="audioCard">
+                    <div class="audio-visualizer" id="audioVisualizer">
+                        <div class="audio-bar"></div>
+                        <div class="audio-bar"></div>
+                        <div class="audio-bar"></div>
+                        <div class="audio-bar"></div>
+                        <div class="audio-bar"></div>
+                        <div class="audio-bar"></div>
+                        <div class="audio-bar"></div>
+                        <div class="audio-bar"></div>
+                    </div>
+                    <div class="audio-info">
+                        <div class="audio-info__title" id="audioTitle">Ambient Focus Stream</div>
+                        <div class="audio-info__detail" id="audioDetail">Stopped</div>
+                    </div>
+                    <div class="audio-controls">
+                        <button id="audioToggleBtn" class="btn btn--ghost" onclick="toggleAudioManual()">
+                            ▶ Play
+                        </button>
+                        <input
+                            type="range"
+                            id="volumeSlider"
+                            class="volume-slider"
+                            min="0" max="100" value="40"
+                            oninput="setVolume(this.value)"
+                        />
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── Event Log ─────────────────────────────────── -->
+            <section class="log-section">
+                <div class="card">
+                    <div class="card__label">
+                        <span class="card__label-icon">📋</span> Agent Event Log
+                    </div>
+                    <div class="event-log" id="eventLog"></div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- ═══════════ HITL CONFIRMATION MODAL ═══════════ -->
+    <div class="hitl-overlay" id="hitlOverlay">
+        <div class="hitl-modal">
+            <div class="hitl-modal__icon">🛡️</div>
+            <div class="hitl-modal__title">Human-in-the-Loop Confirmation</div>
+            <div class="hitl-modal__body" id="hitlBody">
+                Loading…
+            </div>
+            <div class="hitl-modal__actions">
+                <button class="btn btn--danger" onclick="hitlDecline()">Decline</button>
+                <button class="btn btn--confirm" onclick="hitlConfirm()">✓ Confirm &amp; Activate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ JAVASCRIPT ═══════════ -->
+    <script>
+    (() => {
+        "use strict";
+
+        /* ==============================================================
+           CONFIGURATION
+           ============================================================== */
+        const API_BASE       = "http://localhost:8000";
+        const USER_ID        = "hackathon_user_1";
+        const POLL_INTERVAL  = 1000;   // ms
+        const CIRCUMFERENCE  = 2 * Math.PI * 120;  // matches SVG r=120
+
+        /* ==============================================================
+           DOM REFERENCES
+           ============================================================== */
+        const $  = (sel) => document.querySelector(sel);
+        const $$ = (sel) => document.querySelectorAll(sel);
+
+        const dom = {
+            intentInput:     $("#intentInput"),
+            sendBtn:         $("#sendBtn"),
+            durationInput:   $("#durationInput"),
+            durationPicker:  $("#durationPicker"),
+            timerDisplay:    $("#timerDisplay"),
+            timerPhaseLabel: $("#timerPhaseLabel"),
+            timerProgress:   $("#timerProgress"),
+            timerRingWrapper:$("#timerRingWrapper"),
+            cancelBtn:       $("#cancelBtn"),
+            resetBtn:        $("#resetBtn"),
+            lightingCard:    $("#lightingCard"),
+            lightingBulb:    $("#lightingBulb"),
+            lightingStatus:  $("#lightingStatus"),
+            lightingDetail:  $("#lightingDetail"),
+            dndIconCircle:   $("#dndIconCircle"),
+            dndStatus:       $("#dndStatus"),
+            dndDetail:       $("#dndDetail"),
+            dndBadge:        $("#dndBadge"),
+            dndBadgeDot:     $("#dndBadgeDot"),
+            dndBadgeText:    $("#dndBadgeText"),
+            audioVisualizer: $("#audioVisualizer"),
+            audioTitle:      $("#audioTitle"),
+            audioDetail:     $("#audioDetail"),
+            audioToggleBtn:  $("#audioToggleBtn"),
+            volumeSlider:    $("#volumeSlider"),
+            eventLog:        $("#eventLog"),
+            hitlOverlay:     $("#hitlOverlay"),
+            hitlBody:        $("#hitlBody"),
+        };
+
+        /* ==============================================================
+           STATE
+           ============================================================== */
+        let currentSession  = null;
+        let pollTimer       = null;
+        let localCountdown  = null;
+        let audioCtx        = null;
+        let audioNodes      = {};
+        let isAudioPlaying  = false;
+
+        /* ==============================================================
+           LOGGING
+           ============================================================== */
+        function logEvent(tag, message) {
+            const now  = new Date();
+            const time = now.toLocaleTimeString("en-GB", { hour12: false });
+            const cls  = {info:"info", success:"success", warn:"warn", error:"error"}[tag] || "info";
+
+            const entry = document.createElement("div");
+            entry.className = "event-log__entry";
+            entry.innerHTML =
+                `<span class="event-log__time">${time}</span>` +
+                `<span class="event-log__tag event-log__tag--${cls}">[${tag.toUpperCase()}]</span>` +
+                `<span>${message}</span>`;
+
+            dom.eventLog.prepend(entry);
+
+            // Trim log to 80 entries
+            while (dom.eventLog.children.length > 80) {
+                dom.eventLog.removeChild(dom.eventLog.lastChild);
+            }
+        }
+
+        /* ==============================================================
+           AUDIO ENGINE  (Web Audio API — generates ambient tone)
+           ============================================================== */
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+            // Master gain
+            const master = audioCtx.createGain();
+            master.gain.value = 0;
+            master.connect(audioCtx.destination);
+            audioNodes.master = master;
+
+            // Binaural-style dual oscillators for ambient drone
+            const osc1 = audioCtx.createOscillator();
+            osc1.type = "sine";
+            osc1.frequency.value = 174;  // Solfeggio — grounding
+            const gain1 = audioCtx.createGain();
+            gain1.gain.value = 0.3;
+            osc1.connect(gain1).connect(master);
+
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = "sine";
+            osc2.frequency.value = 178;  // slight beat frequency
+            const gain2 = audioCtx.createGain();
+            gain2.gain.value = 0.3;
+            osc2.connect(gain2).connect(master);
+
+            // Soft noise layer
+            const bufferSize = audioCtx.sampleRate * 2;
+            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * 0.015;
+            }
+            const noiseSrc = audioCtx.createBufferSource();
+            noiseSrc.buffer = noiseBuffer;
+            noiseSrc.loop = true;
+
+            const noiseFilter = audioCtx.createBiquadFilter();
+            noiseFilter.type = "lowpass";
+            noiseFilter.frequency.value = 400;
+            noiseSrc.connect(noiseFilter).connect(master);
+
+            // Third harmonic pad
+            const osc3 = audioCtx.createOscillator();
+            osc3.type = "triangle";
+            osc3.frequency.value = 261.6;  // C4
+            const gain3 = audioCtx.createGain();
+            gain3.gain.value = 0.08;
+            osc3.connect(gain3).connect(master);
+
+            // Store for cleanup
+            audioNodes.oscillators = [osc1, osc2, osc3];
+            audioNodes.noiseSrc = noiseSrc;
+
+            // Start all sources
+            osc1.start(); osc2.start(); osc3.start(); noiseSrc.start();
+        }
+
+        function startAudio() {
+            initAudio();
+            if (audioCtx.state === "suspended") audioCtx.resume();
+
+            const vol = parseInt(dom.volumeSlider.value, 10) / 100;
+            audioNodes.master.gain.cancelScheduledValues(audioCtx.currentTime);
+            audioNodes.master.gain.setTargetAtTime(vol * 0.5, audioCtx.currentTime, 0.8);
+
+            isAudioPlaying = true;
+            updateAudioUI(true);
+            logEvent("info", "Ambient focus audio stream started.");
+        }
+
+        function stopAudio() {
+            if (!audioCtx || !audioNodes.master) return;
+            audioNodes.master.gain.cancelScheduledValues(audioCtx.currentTime);
+            audioNodes.master.gain.setTargetAtTime(0, audioCtx.currentTime, 0.3);
+
+            isAudioPlaying = false;
+            updateAudioUI(false);
+            logEvent("info", "Ambient audio stream stopped.");
+        }
+
+        function setVolume(val) {
+            if (!audioCtx || !audioNodes.master) return;
+            const v = parseInt(val, 10) / 100;
+            audioNodes.master.gain.setTargetAtTime(v * 0.5, audioCtx.currentTime, 0.1);
+        }
+
+        function toggleAudioManual() {
+            if (isAudioPlaying) { stopAudio(); } else { startAudio(); }
+        }
+
+        function updateAudioUI(playing) {
+            const bars = dom.audioVisualizer.querySelectorAll(".audio-bar");
+            bars.forEach(b => b.classList.toggle("active", playing));
+            dom.audioToggleBtn.textContent = playing ? "⏸ Pause" : "▶ Play";
+            dom.audioDetail.textContent     = playing ? "Playing — Binaural ambient stream" : "Stopped";
+        }
+
+        /* ==============================================================
+           TIMER DISPLAY
+           ============================================================== */
+        function formatTime(totalSeconds) {
+            const m = Math.floor(totalSeconds / 60);
+            const s = totalSeconds % 60;
+            return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+        }
+
+        function updateTimerRing(remaining, total) {
+            if (total <= 0) {
+                dom.timerProgress.style.strokeDashoffset = "0";
+                return;
+            }
+            const fraction = remaining / total;
+            const offset   = CIRCUMFERENCE * (1 - fraction);
+            dom.timerProgress.style.strokeDashoffset = offset;
+        }
+
+        /* ==============================================================
+           UI SYNC — maps session state → visual state
+           ============================================================== */
+        function syncUI(session) {
+            if (!session) return;
+
+            const phase    = session.phase;
+            const total    = session.focus_duration_minutes * 60;
+            const remaining = session.remaining_seconds;
+
+            // ── Timer display ──────────────────────────
+            dom.timerDisplay.textContent = formatTime(remaining || total);
+            updateTimerRing(remaining || total, total);
+
+            const phaseLabels = {
+                idle: "Idle",
+                awaiting_confirmation: "Awaiting Confirmation",
+                focus_active: "Focus Active",
+                break_mode: "Break Time ☕",
+                cancelled: "Cancelled",
+            };
+            dom.timerPhaseLabel.textContent = phaseLabels[phase] || phase;
+
+            // Ring glow
+            dom.timerRingWrapper.classList.remove("glow-focus", "glow-break");
+            if (phase === "focus_active") dom.timerRingWrapper.classList.add("glow-focus");
+            if (phase === "break_mode")   dom.timerRingWrapper.classList.add("glow-break");
+
+            // Ring gradient swap
+            if (phase === "break_mode") {
+                dom.timerProgress.setAttribute("stroke", "url(#ring-gradient-break)");
+            } else {
+                dom.timerProgress.setAttribute("stroke", "url(#ring-gradient)");
+            }
+
+            // Button states
+            dom.cancelBtn.disabled = !(phase === "focus_active" || phase === "awaiting_confirmation");
+            dom.durationPicker.style.opacity = phase === "focus_active" ? "0.3" : "1";
+            dom.durationInput.disabled = phase === "focus_active";
+
+            // ── Lighting card ──────────────────────────
+            const lc = dom.lightingCard;
+            const lb = dom.lightingBulb;
+            lc.classList.remove("lighting-card--normal","lighting-card--focus","lighting-card--break");
+            lb.classList.remove("lighting-bulb--normal","lighting-bulb--focus","lighting-bulb--break");
+            dom.lightingStatus.classList.remove("lighting-info__status--normal","lighting-info__status--focus","lighting-info__status--break");
+
+            if (session.lighting_status === "focus") {
+                lc.classList.add("lighting-card--focus");
+                lb.classList.add("lighting-bulb--focus");
+                dom.lightingStatus.classList.add("lighting-info__status--focus");
+                dom.lightingStatus.textContent = "Deep Focus Blue";
+                dom.lightingDetail.textContent = "Neon blue — optimised for concentration";
+                lb.textContent = "🔵";
+            } else if (session.lighting_status === "break") {
+                lc.classList.add("lighting-card--break");
+                lb.classList.add("lighting-bulb--break");
+                dom.lightingStatus.classList.add("lighting-info__status--break");
+                dom.lightingStatus.textContent = "Pastel Green — Break";
+                dom.lightingDetail.textContent = "Soft green — time to rest your eyes";
+                lb.textContent = "🟢";
+            } else {
+                lc.classList.add("lighting-card--normal");
+                lb.classList.add("lighting-bulb--normal");
+                dom.lightingStatus.classList.add("lighting-info__status--normal");
+                dom.lightingStatus.textContent = "Standard White";
+                dom.lightingDetail.textContent = "Normal ambient lighting active";
+                lb.textContent = "💡";
+            }
+
+            // ── DND card ───────────────────────────────
+            const engaged = session.dnd_status === "engaged";
+            dom.dndIconCircle.className = `dnd-icon-circle dnd-icon-circle--${engaged ? "engaged" : "off"}`;
+            dom.dndIconCircle.textContent = engaged ? "🔕" : "🔔";
+
+            dom.dndStatus.className = `dnd-info__status dnd-info__status--${engaged ? "engaged" : "off"}`;
+            dom.dndStatus.textContent = engaged ? "Do Not Disturb" : "Notifications Active";
+            dom.dndDetail.textContent = engaged
+                ? "All notifications silenced via MacroDroid"
+                : "All alerts coming through";
+
+            dom.dndBadge.className = `dnd-badge dnd-badge--${engaged ? "engaged" : "off"}`;
+            dom.dndBadgeDot.className = `dnd-badge__dot dnd-badge__dot--${engaged ? "engaged" : "off"}`;
+            dom.dndBadgeText.textContent = engaged ? "DND Engaged" : "DND Off";
+
+            // ── Audio sync ─────────────────────────────
+            if (session.music_status === "playing" && !isAudioPlaying) {
+                startAudio();
+            } else if (session.music_status !== "playing" && isAudioPlaying) {
+                stopAudio();
+            }
+        }
+
+        /* ==============================================================
+           API HELPERS
+           ============================================================== */
+        async function apiPost(path, body) {
+            try {
+                const resp = await fetch(`${API_BASE}${path}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                });
+                if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+                    throw new Error(err.detail || resp.statusText);
+                }
+                return await resp.json();
+            } catch (e) {
+                logEvent("error", `API ${path} failed: ${e.message}`);
+                throw e;
+            }
+        }
+
+        async function apiGet(path) {
+            try {
+                const resp = await fetch(`${API_BASE}${path}`);
+                if (!resp.ok) throw new Error(resp.statusText);
+                return await resp.json();
+            } catch (e) {
+                logEvent("error", `API ${path} poll failed: ${e.message}`);
+                return null;
+            }
+        }
+
+        /* ==============================================================
+           POLLING  (updates UI from server state)
+           ============================================================== */
+        function startPolling() {
+            if (pollTimer) return;
+            pollTimer = setInterval(async () => {
+                const data = await apiGet(`/api/session/${USER_ID}`);
+                if (data && data.session) {
+                    const prev = currentSession;
+                    currentSession = data.session;
+                    syncUI(currentSession);
+
+                    // Detect phase transitions
+                    if (prev && prev.phase !== currentSession.phase) {
+                        logEvent("success", `Phase transition: ${prev.phase} → ${currentSession.phase}`);
+
+                        if (currentSession.phase === "break_mode") {
+                            logEvent("success", "🎉 Focus session complete — entering break mode.");
+                        }
+                    }
+                }
+            }, POLL_INTERVAL);
+        }
+
+        /* ==============================================================
+           INTENT HANDLER  (HITL flow)
+           ============================================================== */
+        window.handleSendIntent = async function () {
+            const text = dom.intentInput.value.trim();
+            if (!text) return;
+
+            const duration = parseInt(dom.durationInput.value, 10) || 25;
+            logEvent("info", `Sending intent: "${text}" (${duration} min)`);
+
+            try {
+                const result = await apiPost("/api/intent", {
+                    user_id: USER_ID,
+                    text: text,
+                    confirmed: false,
+                    duration_minutes: duration,
+                });
+
+                currentSession = result.session;
+                syncUI(currentSession);
+
+                if (result.status === "awaiting_confirmation") {
+                    // Show HITL modal
+                    dom.hitlBody.textContent = result.message;
+                    dom.hitlOverlay.classList.add("visible");
+                    logEvent("warn", "HITL gate — awaiting user confirmation.");
+                } else if (result.status === "unrecognised_intent") {
+                    logEvent("warn", result.message);
+                } else {
+                    logEvent("success", result.message);
+                }
+            } catch (e) {
+                /* already logged in apiPost */
+            }
+        };
+
+        // Allow Enter key to submit
+        dom.intentInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") window.handleSendIntent();
+        });
+
+        /* ==============================================================
+           HITL CONFIRMATION / DECLINE
+           ============================================================== */
+        window.hitlConfirm = async function () {
+            dom.hitlOverlay.classList.remove("visible");
+
+            if (!currentSession) return;
+            logEvent("info", "User confirmed — activating focus mode…");
+
+            try {
+                const result = await apiPost("/api/confirm", {
+                    user_id: USER_ID,
+                    session_id: currentSession.session_id,
+                    confirmed: true,
+                });
+
+                currentSession = result.session;
+                syncUI(currentSession);
+                logEvent("success", result.message);
+            } catch (e) { /* logged */ }
+        };
+
+        window.hitlDecline = function () {
+            dom.hitlOverlay.classList.remove("visible");
+            logEvent("warn", "User declined focus session.");
+
+            if (currentSession) {
+                apiPost("/api/confirm", {
+                    user_id: USER_ID,
+                    session_id: currentSession.session_id,
+                    confirmed: false,
+                }).then((result) => {
+                    if (result) {
+                        currentSession = result.session;
+                        syncUI(currentSession);
+                    }
+                }).catch(() => {});
+            }
+        };
+
+        /* ==============================================================
+           CANCEL / RESET
+           ============================================================== */
+        window.handleCancel = async function () {
+            if (!currentSession) return;
+            logEvent("warn", "Cancelling active session…");
+
+            try {
+                const result = await apiPost("/api/cancel", {
+                    user_id: USER_ID,
+                    session_id: currentSession.session_id,
+                });
+
+                currentSession = result.session;
+                syncUI(currentSession);
+                logEvent("info", result.message);
+            } catch (e) { /* logged */ }
+        };
+
+        window.handleReset = async function () {
+            logEvent("info", "Hard-resetting session…");
+
+            try {
+                await apiPost(`/api/reset/${USER_ID}`, {});
+            } catch (e) { /* logged */ }
+
+            currentSession = null;
+            const idle = {
+                phase: "idle",
+                focus_duration_minutes: parseInt(dom.durationInput.value, 10) || 25,
+                remaining_seconds: 0,
+                elapsed_seconds: 0,
+                lighting_status: "normal",
+                dnd_status: "off",
+                music_status: "stopped",
+            };
+            syncUI(idle);
+            logEvent("info", "Session reset to idle.");
+        };
+
+        /* ==============================================================
+           STANDALONE SIMULATION MODE
+           (runs entirely client-side when the backend is not reachable)
+           ============================================================== */
+        let simInterval = null;
+        let simSession  = null;
+
+        function isBackendAvailable() {
+            return fetch(`${API_BASE}/`, { method: "HEAD", mode: "cors" })
+                .then(r => r.ok)
+                .catch(() => false);
+        }
+
+        function startSimCountdown(duration) {
+            if (simInterval) clearInterval(simInterval);
+            const total = duration * 60;
+            simSession.remaining_seconds = total;
+            simSession.elapsed_seconds   = 0;
+
+            simInterval = setInterval(() => {
+                simSession.elapsed_seconds++;
+                simSession.remaining_seconds = total - simSession.elapsed_seconds;
+
+                if (simSession.remaining_seconds <= 0) {
+                    clearInterval(simInterval);
+                    simInterval = null;
+                    simSession.phase = "break_mode";
+                    simSession.lighting_status = "break";
+                    simSession.dnd_status = "off";
+                    simSession.music_status = "stopped";
+                    logEvent("success", "🎉 Focus complete — entering break mode.");
+                }
+                syncUI(simSession);
+            }, 1000);
+        }
+
+        async function initSimulationMode() {
+            logEvent("warn", "Backend unreachable — running in standalone simulation mode.");
+
+            // Override handlers for client-only simulation
+            window.handleSendIntent = function () {
+                const text = dom.intentInput.value.trim();
+                if (!text) return;
+                const duration = parseInt(dom.durationInput.value, 10) || 25;
+                logEvent("info", `[SIM] Intent: "${text}" (${duration} min)`);
+
+                const focusKw = ["focus","deep work","concentrate","pomodoro","study","work mode"];
+                if (!focusKw.some(k => text.toLowerCase().includes(k))) {
+                    logEvent("warn", "[SIM] No focus keyword detected.");
+                    return;
+                }
+
+                simSession = {
+                    user_id: USER_ID,
+                    session_id: "sim_" + Date.now().toString(36),
+                    phase: "awaiting_confirmation",
+                    focus_duration_minutes: duration,
+                    elapsed_seconds: 0,
+                    remaining_seconds: duration * 60,
+                    confirmed: false,
+                    lighting_status: "normal",
+                    dnd_status: "off",
+                    music_status: "stopped",
+                };
+                currentSession = simSession;
+                syncUI(simSession);
+
+                dom.hitlBody.textContent =
+                    `I'll set up a ${duration}-minute deep-focus session. ` +
+                    `This will dim your lights to focus blue, enable Do Not Disturb, ` +
+                    `and play ambient music. Shall I proceed?`;
+                dom.hitlOverlay.classList.add("visible");
+                logEvent("warn", "[SIM] HITL gate — awaiting confirmation.");
+            };
+
+            window.hitlConfirm = function () {
+                dom.hitlOverlay.classList.remove("visible");
+                if (!simSession) return;
+
+                simSession.confirmed = true;
+                simSession.phase = "focus_active";
+                simSession.lighting_status = "focus";
+                simSession.dnd_status = "engaged";
+                simSession.music_status = "playing";
+                currentSession = simSession;
+                syncUI(simSession);
+
+                startSimCountdown(simSession.focus_duration_minutes);
+                logEvent("success", `[SIM] Focus mode activated for ${simSession.focus_duration_minutes} min.`);
+                logEvent("info", "[SIM] IFTTT focus_lights_on webhook → simulated OK.");
+                logEvent("info", "[SIM] MacroDroid DND ON webhook → simulated OK.");
+            };
+
+            window.hitlDecline = function () {
+                dom.hitlOverlay.classList.remove("visible");
+                if (simSession) {
+                    simSession.phase = "cancelled";
+                    currentSession = simSession;
+                    syncUI(simSession);
+                }
+                logEvent("warn", "[SIM] User declined. Session cancelled.");
+            };
+
+            window.handleCancel = function () {
+                if (simInterval) { clearInterval(simInterval); simInterval = null; }
+                if (simSession) {
+                    simSession.phase = "cancelled";
+                    simSession.lighting_status = "normal";
+                    simSession.dnd_status = "off";
+                    simSession.music_status = "stopped";
+                    currentSession = simSession;
+                    syncUI(simSession);
+                }
+                logEvent("info", "[SIM] Session cancelled. Environment restored.");
+            };
+
+            window.handleReset = function () {
+                if (simInterval) { clearInterval(simInterval); simInterval = null; }
+                simSession = null;
+                currentSession = null;
+                const idle = {
+                    phase: "idle",
+                    focus_duration_minutes: parseInt(dom.durationInput.value, 10) || 25,
+                    remaining_seconds: 0,
+                    elapsed_seconds: 0,
+                    lighting_status: "normal",
+                    dnd_status: "off",
+                    music_status: "stopped",
+                };
+                syncUI(idle);
+                logEvent("info", "[SIM] Full reset to idle.");
+            };
+        }
+
+        /* ==============================================================
+           BOOTSTRAP
+           ============================================================== */
+        async function boot() {
+            logEvent("info", "Alexa+ Ambient Focus Agent dashboard initialising…");
+
+            // Set initial timer display
+            const initDur = parseInt(dom.durationInput.value, 10) || 25;
+            dom.timerDisplay.textContent = formatTime(initDur * 60);
+            updateTimerRing(initDur * 60, initDur * 60);
+
+            dom.durationInput.addEventListener("input", () => {
+                if (!currentSession || currentSession.phase === "idle" || currentSession.phase === "cancelled") {
+                    const d = parseInt(dom.durationInput.value, 10) || 25;
+                    dom.timerDisplay.textContent = formatTime(d * 60);
+                    updateTimerRing(d * 60, d * 60);
+                }
+            });
+
+            const backendOk = await isBackendAvailable();
+            if (backendOk) {
+                logEvent("success", "Connected to backend at " + API_BASE);
+                startPolling();
+            } else {
+                await initSimulationMode();
+            }
+
+            logEvent("success", "Dashboard ready.");
+        }
+
+        boot();
+    })();
+    </script>
+</body>
+</html>
